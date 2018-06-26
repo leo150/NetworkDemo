@@ -6,10 +6,10 @@ namespace BeardedManStudios.Forge.Networking.Generated
 {
 	[GeneratedRPC("{\"types\":[]")]
 	[GeneratedRPCVariableNames("{\"types\":[]")]
-	public abstract partial class PlayerBehavior : NetworkBehavior
+	public abstract partial class GameManagerBehavior : NetworkBehavior
 	{
 		
-		public PlayerNetworkObject networkObject = null;
+		public GameManagerNetworkObject networkObject = null;
 
 		public override void Initialize(NetworkObject obj)
 		{
@@ -17,7 +17,7 @@ namespace BeardedManStudios.Forge.Networking.Generated
 			if (networkObject != null && networkObject.AttachedBehavior != null)
 				return;
 			
-			networkObject = (PlayerNetworkObject)obj;
+			networkObject = (GameManagerNetworkObject)obj;
 			networkObject.AttachedBehavior = this;
 
 			base.SetupHelperRpcs(networkObject);
@@ -76,7 +76,7 @@ namespace BeardedManStudios.Forge.Networking.Generated
 
 		public override void Initialize(NetWorker networker, byte[] metadata = null)
 		{
-			Initialize(new PlayerNetworkObject(networker, createCode: TempAttachCode, metadata: metadata));
+			Initialize(new GameManagerNetworkObject(networker, createCode: TempAttachCode, metadata: metadata));
 		}
 
 		private void DestroyGameObject(NetWorker sender)
@@ -87,7 +87,7 @@ namespace BeardedManStudios.Forge.Networking.Generated
 
 		public override NetworkObject CreateNetworkObject(NetWorker networker, int createCode, byte[] metadata = null)
 		{
-			return new PlayerNetworkObject(networker, this, createCode, metadata);
+			return new GameManagerNetworkObject(networker, this, createCode, metadata);
 		}
 
 		protected override void InitializedTransform()
