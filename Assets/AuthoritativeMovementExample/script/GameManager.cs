@@ -14,8 +14,11 @@ namespace AuthMovementExample
         public static GameManager Instance = null;
 
         // List of players
-        private Dictionary<uint, PlayerBehavior> _playerObjects = new Dictionary<uint, PlayerBehavior>();
-        public Dictionary<uint, PlayerBehavior> GetPlayers() { return _playerObjects; }
+        private Dictionary<uint, List<PlayerBehavior>> _playerObjects = new Dictionary<uint, List<PlayerBehavior>>();
+
+        //public Dictionary<uint, PlayerBehavior> GetPlayers() { return _playerObjects; }
+
+        private HashSet<uint> _playerIds = new HashSet<uint>();
 
         private bool _netStarted = false;
 
@@ -43,7 +46,7 @@ namespace AuthMovementExample
 
             _netStarted = true;
 
-            Debug.Log("NetworkStart");
+            Debug.Log("GameManager: NetworkStart");
 
             if (NetworkManager.Instance.IsServer)
             {
@@ -54,16 +57,30 @@ namespace AuthMovementExample
                     {
                         uint networkId = player.NetworkId;
 
-                        Debug.Log("playerConnected; networkId: " + networkId);
-
-                        if (_playerObjects.ContainsKey(networkId)) {
+                        if (_playerIds.Contains(networkId)) {
                             Debug.LogWarning("Already contains player with networkId: " + networkId);
-                            return;
                         }
+                        else {
+                            Debug.Log("playerConnected; networkId: " + networkId);
 
-                        PlayerBehavior p = NetworkManager.Instance.InstantiatePlayer();
-                        p.networkObject.ownerNetId = networkId;
-                        _playerObjects.Add(player.NetworkId, p);
+                            _playerIds.Add(networkId);
+
+                            List<PlayerBehavior> objects = new List<PlayerBehavior>();
+
+                            PlayerBehavior p1 = NetworkManager.Instance.InstantiatePlayer();
+                            p1.networkObject.ownerNetId = networkId;
+                            objects.Add(p1);
+
+                            PlayerBehavior p2 = NetworkManager.Instance.InstantiatePlayer();
+                            p2.networkObject.ownerNetId = networkId;
+                            objects.Add(p2);
+
+                            PlayerBehavior p3 = NetworkManager.Instance.InstantiatePlayer();
+                            p3.networkObject.ownerNetId = networkId;
+                            objects.Add(p3);
+
+                            _playerObjects.Add(networkId, objects);
+                        }
                     });
                 };
 
@@ -71,18 +88,25 @@ namespace AuthMovementExample
                 {
                     uint networkId = player.NetworkId;
 
-                    Debug.Log("playerDisconnected; networkId: " + networkId);
-
-                    if (!_playerObjects.ContainsKey(networkId))
+                    if (_playerIds.Contains(networkId))
                     {
+                        Debug.Log("playerDisconnected; networkId: " + networkId);
+                       
+                        _playerIds.Remove(networkId);
+
+                        List<PlayerBehavior> objects = _playerObjects[networkId];
+
+                        foreach (PlayerBehavior p in objects)
+                        {
+                            p.networkObject.Destroy();
+                        }
+
+                        _playerObjects.Remove(networkId);
+                    }
+                    else {
                         Debug.LogWarning("Doesn't contains player with networkId: " + networkId);
                         return;
                     }
-
-                    // Remove the player from the list of players and destroy it
-                    PlayerBehavior p = _playerObjects[networkId];
-                    _playerObjects.Remove(networkId);
-                    p.networkObject.Destroy();
                 };
             }
             else

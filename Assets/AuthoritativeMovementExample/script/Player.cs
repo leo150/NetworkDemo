@@ -45,7 +45,14 @@ namespace AuthMovementExample
             _noFilter = new ContactFilter2D().NoFilter();
         }
 
-        private void Update()
+        protected override void NetworkStart()
+        {
+            base.NetworkStart();
+
+            Debug.Log("Player: NetworkStart");
+        }
+
+		private void Update()
         {
             // Set the networked fields in Update so we are
             // up to date per the last physics update
