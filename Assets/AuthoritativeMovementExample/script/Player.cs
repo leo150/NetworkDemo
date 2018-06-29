@@ -1,42 +1,34 @@
-﻿using BeardedManStudios.Forge.Networking.Generated;
+﻿using BeardedManStudios.Forge.Networking;
+using BeardedManStudios.Forge.Networking.Generated;
 using System;
 using System.Linq;
 using UnityEngine;
 
 namespace AuthMovementExample
 {
-    /*
-     * The networked player object
-     * 
-     * Server-owned but we can find the local owner by comparing the NetworkIds
-     * 
-     * Clientside does prediction and replaying of inputs from latest server update (reconciliation)
-     * Serverside does processing of inputs sent from clients and has authority over the player object's state
-     */
     [RequireComponent(typeof(BoxCollider2D))]
     [RequireComponent(typeof(Rigidbody2D))]
     public class Player : PlayerBehavior
     {
         #region Inspector
         [Tooltip("The movement speed of the player.")]
-        public float Speed = 1.0f;
+        public float speed = 10.0f;
         #endregion
+
+        private float maxDiff = 0.15f;
 
         private Rigidbody2D _rigidBody;
         private Collider2D _collider2D;
         private ContactFilter2D _noFilter;
         private Collider2D[] _collisions = new Collider2D[20];
 
-        private bool _setup = false;
         private bool _isLocalOwner = false;
 
-        private InputFrame _currentInput = null;
-        private InputListener _inputListener;
+        public bool GetIsLocalOwner() {
+            return _isLocalOwner;
+        }
 
-        // Last frame that was processed locally on this machine
-        private uint _lastLocalFrame = 0;
-        // Last frame that was sent (server)/received (client) on the network
-        private uint _lastNetworkFrame = 0;
+        private InputListener _inputListener;
 
         private void Awake()
         {
@@ -50,109 +42,77 @@ namespace AuthMovementExample
             base.NetworkStart();
 
             Debug.Log("Player: NetworkStart");
+
+            CheckIsLocalOwner();
         }
 
-		private void Update()
-        {
-            // Set the networked fields in Update so we are
-            // up to date per the last physics update
-            if (networkObject.IsServer)
-            {
-                if (_lastNetworkFrame < _lastLocalFrame)
-                {
-                    _lastNetworkFrame = _lastLocalFrame;
-                    networkObject.frame = _lastLocalFrame;
-                }
-                networkObject.position = _rigidBody.position;
-            }
-        }
+        private void Update() {}
 
         void FixedUpdate()
         {
-            // Check if this client is the local owner
-            _isLocalOwner = networkObject.MyPlayerId == networkObject.ownerNetId;
+            if (networkObject == null) return;
 
-            #region Setup            
-            // Initial setup - only do this once
-            if ((_isLocalOwner || networkObject.IsServer) && !_setup)
-            {
-                // Interpolation on the predicted client and server does weird things
-                // Only interpolate on non-owner clients
-                // networkObject.positionInterpolation.Enabled = false;
-                
-                _setup = true;
-            }
-
-            // Get the input listener if it doesn't exist and this isn't a remote client
-            if (_inputListener == null) _inputListener = FindObjectsOfType<InputListener>().FirstOrDefault(x => x.networkObject.Owner.NetworkId == networkObject.ownerNetId);
-            #endregion
+            if (FindInputListener() == false) return;
 
             #region Netcode Logic
-            // Server Authority - snap the position on all clients to the server's position
-            if (!networkObject.IsServer)
-            {
-                _rigidBody.position = networkObject.position;
-            }
-
-            /*
-            // Client owner Reconciliation & Prediction
-            if (_isLocalOwner)
-            {
-                if (_inputListener != null)
-                {
-                    // Reconciliation - only do this if the server update is current or new
-                    if (networkObject.frame != 0 && _lastNetworkFrame <= networkObject.frame)
-                    {
-                        _lastNetworkFrame = networkObject.frame;
-                        Reconcile();
-                    }
-
-                    // Prediction
-                    if (_inputListener.FramesToPlay.Count > 0)
-                    {
-                        InputFrame input = _inputListener.FramesToPlay[0];
-                        _lastLocalFrame = input.frameNumber;
-                        PlayerUpdate(input);
-                        _inputListener.FramesToPlay.RemoveAt(0);
-                    }
-                }
-            }*/
-
-            // Server Processing
-             
             if (networkObject.IsServer)
             {
-                // Reset the current input - we don't want to re-use it if there no inputs in the queue
-                _currentInput = null;
-
-                if (_inputListener != null)
-                {
-                    // Process all available inputs each frame
-                    while (_inputListener.FramesToPlay.Count > 0)
-                    {
-                        _currentInput = _inputListener.FramesToPlay[0];
-                        _lastLocalFrame = _currentInput.frameNumber;
-                        _inputListener.FramesToPlay.RemoveAt(0);
-
-                        // Try-catch is a good idea to handle weird serialization/deserialization errors
-                        try
-                        {
-                            PlayerUpdate(_currentInput);
-                        }
-                        catch (Exception e)
-                        {
-                            Debug.LogError(e + " (Serverside input processing - Player.cs line 104)");
-                        }
-                    }
-                }
+                PlayerUpdate(_inputListener); 
+            }
+            else
+            {
+                _rigidBody.position = networkObject.position;
             }
             #endregion
         }
 
-        private void Move(InputFrame input)
+        // RPC
+        public override void BecomeOwner(RpcArgs args)
         {
-            _rigidBody.velocity = new Vector2(input.horizontal, input.vertical) * Speed * Time.fixedDeltaTime;
-            _rigidBody.position += _rigidBody.velocity;
+            _isLocalOwner = true;
+        }
+
+        private void PlayerUpdate(InputListener inputListener)
+        {
+            Move(inputListener);
+            //PhysicsCollisions();
+
+            networkObject.position = _rigidBody.position;
+        }
+
+        private void Move(InputListener inputListener)
+        {
+            bool useLerp = false;
+            float time = Time.fixedDeltaTime;
+
+            if (useLerp)
+            {
+                var newPosition = Vector2.Lerp(_rigidBody.position,
+                                           inputListener.networkObject.mousePosition, speed * time);
+                var oldPosition = _rigidBody.position;
+                var diff = newPosition - oldPosition;
+
+                if (diff.x > maxDiff)
+                    newPosition.x = oldPosition.x + maxDiff;
+                else if (diff.x < -maxDiff)
+                    newPosition.x = oldPosition.x - maxDiff;
+
+                if (diff.y > maxDiff)
+                    newPosition.y = oldPosition.y + maxDiff;
+                else if (diff.y < -maxDiff)
+                    newPosition.y = oldPosition.y - maxDiff;
+
+                _rigidBody.position = newPosition;
+            }
+            else
+            {
+                Vector2 position = inputListener.networkObject.mousePosition - _rigidBody.position;
+                float signX = Math.Sign(position.x);
+                float signY = Math.Sign(position.y);
+                Vector2 velocity = new Vector2(signX, signY) * speed * time;
+                _rigidBody.velocity = velocity;
+                _rigidBody.position += _rigidBody.velocity;
+            }
         }
 
         private void PhysicsCollisions()
@@ -170,31 +130,51 @@ namespace AuthMovementExample
             }
         }
 
-        private void PlayerUpdate(InputFrame input)
+        //Helpers
+
+        private void CheckIsLocalOwner()
         {
-            // Set the velocity to zero, move the player based on the next input, then detect & resolve collisions
-            _rigidBody.velocity = Vector2.zero;
-            if (input != null && input.HasInput)
-            {
-                Move(input);
-            }
-            PhysicsCollisions();
+            if (networkObject.IsServer == false) return;
+
+            if (OwnerNetworkId == networkObject.MyPlayerId)
+                _isLocalOwner = true;
         }
 
-        private void Reconcile()
+        // Return true if find input listener or return false
+        private bool FindInputListener()
         {
-            // Remove any inputs up to and including the last input processed by the server
-            _inputListener.FramesToReconcile.RemoveAll(f => f.frameNumber <= networkObject.frame);
-            
-            // Replay them all back to the last input processed by client prediction
-            if (_inputListener.FramesToReconcile.Count > 0)
+            if (_inputListener == null)
             {
-                foreach (InputFrame input in _inputListener.FramesToReconcile)
+                if (networkObject.IsServer)
                 {
-                    // Don't replay frames that haven't been predicted yet if there are any
-                    if (input.frameNumber > _lastLocalFrame) break;
-                    PlayerUpdate(input);
+                    InputListener[] listeners = FindObjectsOfType<InputListener>();
+                    foreach (InputListener listener in listeners)
+                    {
+                        if (listener.networkObject.Owner.NetworkId == OwnerNetworkId)
+                        {
+                            _inputListener = listener;
+                            return true;
+                        }
+                    }
                 }
+                else
+                {
+                    InputListener[] listeners = FindObjectsOfType<InputListener>();
+                    foreach (InputListener listener in listeners)
+                    {
+                        if (listener.networkObject.IsOwner)
+                        {
+                            _inputListener = listener;
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            else
+            {
+                return true;
             }
         }
     }

@@ -4,11 +4,10 @@ using UnityEngine;
 
 namespace BeardedManStudios.Forge.Networking.Generated
 {
-	[GeneratedRPC("{\"types\":[[\"byte[]\"]]")]
-	[GeneratedRPCVariableNames("{\"types\":[[\"bytes\"]]")]
+	[GeneratedRPC("{\"types\":[]")]
+	[GeneratedRPCVariableNames("{\"types\":[]")]
 	public abstract partial class InputListenerBehavior : NetworkBehavior
 	{
-		public const byte RPC_SYNC_INPUTS = 0 + 5;
 		
 		public InputListenerNetworkObject networkObject = null;
 
@@ -22,7 +21,6 @@ namespace BeardedManStudios.Forge.Networking.Generated
 			networkObject.AttachedBehavior = this;
 
 			base.SetupHelperRpcs(networkObject);
-			networkObject.RegisterRpc("SyncInputs", SyncInputs, typeof(byte[]));
 
 			networkObject.onDestroy += DestroyGameObject;
 
@@ -97,11 +95,6 @@ namespace BeardedManStudios.Forge.Networking.Generated
 			networkObject.SnapInterpolations();
 		}
 
-		/// <summary>
-		/// Arguments:
-		/// byte[] bytes
-		/// </summary>
-		public abstract void SyncInputs(RpcArgs args);
 
 		// DO NOT TOUCH, THIS GETS GENERATED PLEASE EXTEND THIS CLASS IF YOU WISH TO HAVE CUSTOM CODE ADDITIONS
 	}

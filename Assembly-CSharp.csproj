@@ -66,6 +66,7 @@
     <Compile Include="Assets\AuthoritativeMovementExample\script\InputFrame.cs" />
     <Compile Include="Assets\AuthoritativeMovementExample\script\InputListener.cs" />
     <Compile Include="Assets\AuthoritativeMovementExample\script\Player.cs" />
+    <Compile Include="Assets\AuthoritativeMovementExample\script\PlayerDebug.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Examples\Cube Forge\Scripts\CubeForgeGame.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Examples\Cube Forge\Scripts\NetCam.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Examples\Cube Forge\Scripts\Primitive.cs" />
@@ -87,8 +88,6 @@
     <Compile Include="Assets\Bearded Man Studios Inc\Generated\UserGenerated\NetworkCameraNetworkObject.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Generated\UserGenerated\PlayerBehavior.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Generated\UserGenerated\PlayerNetworkObject.cs" />
-    <Compile Include="Assets\Bearded Man Studios Inc\Generated\UserGenerated\TestBehavior.cs" />
-    <Compile Include="Assets\Bearded Man Studios Inc\Generated\UserGenerated\TestNetworkObject.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Modules\Chat\ChatMaker.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Modules\Chat\ChatManager.cs" />
     <Compile Include="Assets\Bearded Man Studios Inc\Modules\LobbySystem\LobbyManager.cs" />

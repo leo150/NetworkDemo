@@ -1,7 +1,17 @@
-﻿using BeardedManStudios.Forge.Networking.Generated;
+﻿using BeardedManStudios.Forge.Networking;
+using BeardedManStudios.Forge.Networking.Generated;
 using BeardedManStudios.Forge.Networking.Unity;
 using System.Collections.Generic;
 using UnityEngine;
+
+namespace BeardedManStudios.Forge.Networking.Generated
+{
+    public abstract partial class PlayerBehavior : NetworkBehavior
+    {
+        //Server purpose only
+        public uint OwnerNetworkId = 0;
+    }
+}
 
 namespace AuthMovementExample
 {
@@ -50,9 +60,8 @@ namespace AuthMovementExample
 
             if (NetworkManager.Instance.IsServer)
             {
-                NetworkManager.Instance.Networker.playerConnected += (player, sender) =>
+                NetworkManager.Instance.Networker.playerAccepted += (player, sender) =>
                 {
-                    // Instantiate the player on the main Unity thread, get the Id of its owner and add it to a list of players
                     MainThreadManager.Run(() =>
                     {
                         uint networkId = player.NetworkId;
@@ -63,23 +72,9 @@ namespace AuthMovementExample
                         else {
                             Debug.Log("playerConnected; networkId: " + networkId);
 
-                            _playerIds.Add(networkId);
+                            CreatePlayer(networkId);
 
-                            List<PlayerBehavior> objects = new List<PlayerBehavior>();
-
-                            PlayerBehavior p1 = NetworkManager.Instance.InstantiatePlayer();
-                            p1.networkObject.ownerNetId = networkId;
-                            objects.Add(p1);
-
-                            PlayerBehavior p2 = NetworkManager.Instance.InstantiatePlayer();
-                            p2.networkObject.ownerNetId = networkId;
-                            objects.Add(p2);
-
-                            PlayerBehavior p3 = NetworkManager.Instance.InstantiatePlayer();
-                            p3.networkObject.ownerNetId = networkId;
-                            objects.Add(p3);
-
-                            _playerObjects.Add(networkId, objects);
+                            CallBecomeOwner(player);
                         }
                     });
                 };
@@ -91,29 +86,70 @@ namespace AuthMovementExample
                     if (_playerIds.Contains(networkId))
                     {
                         Debug.Log("playerDisconnected; networkId: " + networkId);
-                       
-                        _playerIds.Remove(networkId);
 
-                        List<PlayerBehavior> objects = _playerObjects[networkId];
-
-                        foreach (PlayerBehavior p in objects)
-                        {
-                            p.networkObject.Destroy();
-                        }
-
-                        _playerObjects.Remove(networkId);
-                    }
-                    else {
-                        Debug.LogWarning("Doesn't contains player with networkId: " + networkId);
-                        return;
+                        DestroyPlayer(networkId, sender);
                     }
                 };
+
+                CreatePlayer(networkObject.MyPlayerId);
+
+                NetworkManager.Instance.InstantiateInputListener();
             }
             else
             {
-                // This is a local client - it needs to list for input
                 NetworkManager.Instance.InstantiateInputListener();
             }
+        }
+
+        private void CreatePlayer(uint networkId)
+        {
+            _playerIds.Add(networkId);
+
+            List<PlayerBehavior> objects = new List<PlayerBehavior>();
+
+            PlayerBehavior p1 = NetworkManager.Instance.InstantiatePlayer();
+
+            p1.OwnerNetworkId = networkId;
+
+            objects.Add(p1);
+
+            _playerObjects.Add(networkId, objects);
+        }
+
+        private void CallBecomeOwner(NetworkingPlayer player)
+        {
+            List<PlayerBehavior> objects = _playerObjects[player.NetworkId];
+
+            foreach (var p in objects)
+            {
+                p.networkObject.SendRpc(player, PlayerBehavior.RPC_BECOME_OWNER);
+            }
+        }
+
+        private void DestroyPlayer(uint networkId, NetWorker sender)
+        {
+            //Removing server-owned player object
+            _playerIds.Remove(networkId);
+
+            List<PlayerBehavior> objects = _playerObjects[networkId];
+
+            foreach (PlayerBehavior p in objects)
+            {
+                p.networkObject.Destroy();
+            }
+
+            //Removing client-owned objects
+            for (int i = sender.NetworkObjectList.Count - 1; i >= 0; i--)
+            {
+                var networkObject = sender.NetworkObjectList[i];
+                if (networkObject.Owner.NetworkId == networkId)
+                {
+                    sender.NetworkObjectList.RemoveAt(i);
+                    networkObject.Destroy();
+                }
+            }
+
+            _playerObjects.Remove(networkId);
         }
     }
 }
